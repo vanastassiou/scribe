@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Capture and organize ideas offline-first">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>Scribe</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <header class="header">
+      <h1 class="header__title">Scribe</h1>
+      <div class="header__status">
+        <span id="sync-status" class="status-indicator" title="Sync status"></span>
+        <span id="offline-indicator" class="offline-badge hidden">Offline</span>
+      </div>
+      <nav class="header__nav">
+        <button id="btn-settings" class="btn btn--icon" aria-label="Settings">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+          </svg>
+        </button>
+      </nav>
+    </header>
+
+    <main class="main">
+      <div class="toolbar">
+        <div class="toolbar__filters">
+          <select id="filter-type" class="select">
+            <option value="">All types</option>
+            <option value="media">Media</option>
+            <option value="project">Projects</option>
+            <option value="note">Notes</option>
+          </select>
+          <select id="filter-status" class="select">
+            <option value="">All statuses</option>
+          </select>
+          <input type="text" id="filter-tags" class="input" placeholder="Filter by tag...">
+        </div>
+        <div class="toolbar__search">
+          <input type="search" id="search" class="input input--search" placeholder="Search ideas...">
+        </div>
+        <div class="toolbar__actions">
+          <button id="btn-new" class="btn btn--primary">
+            <span class="btn__icon">+</span>
+            <span class="btn__text">New idea</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="idea-list" class="idea-list">
+        <!-- Ideas rendered here -->
+      </div>
+
+      <div id="empty-state" class="empty-state hidden">
+        <p class="empty-state__text">No ideas yet. Click "New idea" to add one.</p>
+      </div>
+    </main>
+
+    <!-- New idea type selector modal -->
+    <dialog id="type-selector" class="modal">
+      <div class="modal__content">
+        <h2 class="modal__title">What kind of idea?</h2>
+        <div class="type-grid">
+          <button class="type-card" data-type="media">
+            <span class="type-card__icon">🎬</span>
+            <span class="type-card__label">Media</span>
+            <span class="type-card__desc">Book, film, show, podcast...</span>
+          </button>
+          <button class="type-card" data-type="project">
+            <span class="type-card__icon">💡</span>
+            <span class="type-card__label">Project</span>
+            <span class="type-card__desc">Something to make or do</span>
+          </button>
+          <button class="type-card" data-type="note">
+            <span class="type-card__icon">📝</span>
+            <span class="type-card__label">Quick note</span>
+            <span class="type-card__desc">Freeform text with tags</span>
+          </button>
+        </div>
+        <button class="btn btn--text modal__close" data-action="close">Cancel</button>
+      </div>
+    </dialog>
+
+    <!-- Idea form modal -->
+    <dialog id="idea-form-modal" class="modal">
+      <div class="modal__content modal__content--form">
+        <h2 id="form-title" class="modal__title">New idea</h2>
+        <form id="idea-form" class="idea-form">
+          <!-- Form fields injected by JS based on type -->
+        </form>
+      </div>
+    </dialog>
+
+    <!-- Settings panel -->
+    <dialog id="settings-modal" class="modal">
+      <div class="modal__content modal__content--settings">
+        <h2 class="modal__title">Settings</h2>
+        <div id="settings-content" class="settings">
+          <!-- Settings injected by JS -->
+        </div>
+        <button class="btn btn--text modal__close" data-action="close">Close</button>
+      </div>
+    </dialog>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
