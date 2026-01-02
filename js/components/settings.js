@@ -174,8 +174,8 @@ export function createSettings(container, options = {}) {
 
       <div class="settings__item">
         <div>
-          <div class="settings__label">Clear all data</div>
-          <div class="settings__desc">Delete all ideas (cannot be undone)</div>
+          <div class="settings__label">Clear local data</div>
+          <div class="settings__desc">Delete all ideas from this device (synced data remains in cloud)</div>
         </div>
         <div class="settings__value">
           <button class="btn btn--danger btn--small" id="clear-btn">
@@ -246,8 +246,8 @@ export function createSettings(container, options = {}) {
 
   // Clear handler
   container.querySelector('#clear-btn').addEventListener('click', async () => {
-    if (!confirm('Delete ALL ideas? This cannot be undone.')) return;
-    if (!confirm('Are you really sure?')) return;
+    if (!confirm('Delete all ideas from this device? Data synced to cloud providers will not be affected.')) return;
+    if (!confirm('Are you sure? This cannot be undone.')) return;
 
     try {
       indexedDB.deleteDatabase('scribe');
