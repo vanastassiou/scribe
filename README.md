@@ -48,6 +48,7 @@ scribe/
 │   └── style.css           # All styles (mobile-first, dark mode)
 └── js/
     ├── app.js              # Main application entry
+    ├── config.js           # API credentials configuration
     ├── db.js               # IndexedDB storage layer
     ├── schemas.js          # Data type definitions
     ├── tags.js             # Tag management
@@ -118,6 +119,37 @@ scribe/
 | `e` | Expand selected item |
 | `Escape` | Collapse / clear search |
 
+## Configuration
+
+API credentials are stored in `js/config.js`, which is excluded from version control.
+
+To set up:
+
+1. Copy the example config:
+
+   ```sh
+   cp js/config.example.js js/config.js
+   ```
+
+2. Edit `js/config.js` with your credentials:
+
+   ```javascript
+   export const config = {
+     google: {
+       clientId: 'YOUR_CLIENT_ID.apps.googleusercontent.com',
+       clientSecret: 'YOUR_CLIENT_SECRET',
+     },
+     dropbox: {
+       appKey: 'YOUR_APP_KEY',
+     },
+     redirectUri: window.location.origin + '/',
+   };
+   ```
+
+Never commit `js/config.js` to version control.
+
+Note: OAuth client IDs are semi-public - they're visible in browser network requests. The real protection comes from your OAuth redirect URI whitelist in the Google/Dropbox console, which ensures tokens are only sent to your authorized domains.
+
 ## Google Drive setup
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
@@ -126,8 +158,7 @@ scribe/
 4. Create OAuth 2.0 credentials:
    - Application type: Web application
    - Authorized redirect URI: `https://your-domain.com/` (your app URL)
-5. Copy the Client ID
-6. Update `js/providers/google-drive.js` with your Client ID
+5. Copy the Client ID and Client Secret to `js/config.js`
 
 Scopes required:
 - `https://www.googleapis.com/auth/drive.file` (access app-created files only)
@@ -136,7 +167,7 @@ Scopes required:
 
 1. In the same Google Cloud project, enable the Google Calendar API
 2. Add the Calendar scope to your OAuth consent screen
-3. Update `js/providers/google-calendar.js` with your Client ID
+3. The same Client ID in `js/config.js` is used for both Drive and Calendar
 
 Scopes required:
 - `https://www.googleapis.com/auth/calendar.events`
@@ -149,8 +180,7 @@ Scopes required:
    - Access type: App folder
 3. Configure permissions: `files.content.write`, `files.content.read`
 4. Add your redirect URI
-5. Copy the App Key
-6. Update `js/providers/dropbox.js` with your App Key
+5. Copy the App Key to `js/config.js`
 
 ## ntfy.sh reminders
 

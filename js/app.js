@@ -10,6 +10,8 @@ import { createIdeaList } from './components/idea-list.js';
 import { createIdeaForm } from './components/idea-form.js';
 import { createSettings, getSettings } from './components/settings.js';
 import { scheduleReminderCheck } from './ntfy.js';
+import googleDrive from './providers/google-drive.js';
+import dropbox from './providers/dropbox.js';
 
 // ==========================================================================
 // App state
@@ -46,6 +48,9 @@ const elements = {
 // ==========================================================================
 
 async function init() {
+  // Handle OAuth callback if present
+  await handleOAuthCallback();
+
   // Initialize database
   await initDB();
 
@@ -311,6 +316,72 @@ function handleSyncConnect(provider) {
 
 function handleSyncDisconnect(provider) {
   console.log(`Disconnecting from ${provider}...`);
+}
+
+// ==========================================================================
+// OAuth callback
+// ==========================================================================
+
+/**
+ * Handle OAuth callback from Google or Dropbox
+ * Checks URL for authorization code and exchanges it for a token
+ */
+async function handleOAuthCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const state = params.get('state');
+
+  if (!code || !state) {
+    return; // Not an OAuth callback
+  }
+
+  // Determine which provider based on saved state (stored in localStorage)
+  const googleState = localStorage.getItem('oauth-google');
+  const dropboxState = localStorage.getItem('oauth-dropbox');
+
+  // Debug logging
+  console.log('OAuth callback - URL state:', state);
+  console.log('OAuth callback - stored google state:', googleState);
+  console.log('OAuth callback - stored dropbox state:', dropboxState);
+
+  try {
+    let matched = false;
+
+    if (googleState) {
+      const parsed = JSON.parse(googleState);
+      console.log('Parsed google state:', parsed.state);
+      if (parsed.state === state) {
+        await googleDrive.handleAuthCallback();
+        console.log('Google Drive connected successfully');
+        matched = true;
+      }
+    }
+
+    if (!matched && dropboxState) {
+      const parsed = JSON.parse(dropboxState);
+      console.log('Parsed dropbox state:', parsed.state);
+      if (parsed.state === state) {
+        await dropbox.handleAuthCallback();
+        console.log('Dropbox connected successfully');
+        matched = true;
+      }
+    }
+
+    if (!matched) {
+      console.error('Unknown OAuth state - no matching provider found');
+      alert('Authentication failed: session expired. Please try again.');
+      window.history.replaceState({}, '', window.location.pathname);
+      return;
+    }
+
+    // Clear URL parameters and reload to show connected state
+    window.history.replaceState({}, '', window.location.pathname);
+    window.location.reload();
+  } catch (err) {
+    console.error('OAuth callback failed:', err);
+    alert(`Connection failed: ${err.message}`);
+    window.history.replaceState({}, '', window.location.pathname);
+  }
 }
 
 // ==========================================================================

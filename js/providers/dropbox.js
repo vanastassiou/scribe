@@ -1,17 +1,11 @@
 /**
  * Dropbox sync provider for Scribe
  *
- * To use this provider:
- * 1. Create a Dropbox app at https://www.dropbox.com/developers/apps
- * 2. Set App Key below
- * 3. Configure redirect URI in app settings
+ * Configure credentials in js/config.js
  */
 
 import { getToken, startAuth, handleCallback, isAuthenticated, logout } from '../oauth.js';
-
-// Replace with your Dropbox App Key
-const APP_KEY = 'YOUR_APP_KEY';
-const REDIRECT_URI = window.location.origin + '/';
+import { config } from '../config.js';
 
 const API_BASE = 'https://api.dropboxapi.com/2';
 const CONTENT_BASE = 'https://content.dropboxapi.com/2';
@@ -29,14 +23,14 @@ export function isConnected() {
  * Start OAuth flow
  */
 export async function connect() {
-  await startAuth('dropbox', APP_KEY, [], REDIRECT_URI);
+  await startAuth('dropbox', config.dropbox.appKey, [], config.redirectUri);
 }
 
 /**
  * Handle OAuth callback
  */
 export async function handleAuthCallback() {
-  return handleCallback('dropbox', APP_KEY, REDIRECT_URI);
+  return handleCallback('dropbox', config.dropbox.appKey, config.redirectUri);
 }
 
 /**
@@ -269,6 +263,7 @@ export default {
   isConnected,
   connect,
   disconnect,
+  handleAuthCallback,
   fetch,
   push,
   uploadAttachment,

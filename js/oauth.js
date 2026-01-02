@@ -53,9 +53,10 @@ async function generatePKCE() {
 
 /**
  * Store OAuth state
+ * Uses localStorage since sessionStorage may not persist across redirects
  */
 function saveOAuthState(provider, state, verifier) {
-  sessionStorage.setItem(`oauth-${provider}`, JSON.stringify({
+  localStorage.setItem(`oauth-${provider}`, JSON.stringify({
     state,
     verifier,
     timestamp: Date.now()
@@ -66,18 +67,25 @@ function saveOAuthState(provider, state, verifier) {
  * Retrieve OAuth state
  */
 function getOAuthState(provider) {
-  const data = sessionStorage.getItem(`oauth-${provider}`);
+  const data = localStorage.getItem(`oauth-${provider}`);
   if (!data) return null;
 
   const parsed = JSON.parse(data);
 
   // Expire after 10 minutes
   if (Date.now() - parsed.timestamp > 10 * 60 * 1000) {
-    sessionStorage.removeItem(`oauth-${provider}`);
+    localStorage.removeItem(`oauth-${provider}`);
     return null;
   }
 
   return parsed;
+}
+
+/**
+ * Clear OAuth state after use
+ */
+function clearOAuthState(provider) {
+  localStorage.removeItem(`oauth-${provider}`);
 }
 
 /**
@@ -172,8 +180,9 @@ export async function startAuth(provider, clientId, scopes, redirectUri) {
  * @param {string} provider - Provider name
  * @param {string} clientId - OAuth client ID
  * @param {string} redirectUri - OAuth redirect URI
+ * @param {string} clientSecret - OAuth client secret (required for some providers)
  */
-export async function handleCallback(provider, clientId, redirectUri) {
+export async function handleCallback(provider, clientId, redirectUri, clientSecret) {
   const config = OAUTH_CONFIG[provider];
   if (!config) {
     throw new Error(`Unknown provider: ${provider}`);
@@ -200,18 +209,25 @@ export async function handleCallback(provider, clientId, redirectUri) {
   }
 
   // Exchange code for token
+  const tokenParams = {
+    client_id: clientId,
+    code,
+    redirect_uri: redirectUri,
+    grant_type: 'authorization_code',
+    code_verifier: savedState.verifier
+  };
+
+  // Add client_secret if provided (required for Google, optional for others)
+  if (clientSecret) {
+    tokenParams.client_secret = clientSecret;
+  }
+
   const tokenResponse = await fetch(config.tokenUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded'
     },
-    body: new URLSearchParams({
-      client_id: clientId,
-      code,
-      redirect_uri: redirectUri,
-      grant_type: 'authorization_code',
-      code_verifier: savedState.verifier
-    })
+    body: new URLSearchParams(tokenParams)
   });
 
   if (!tokenResponse.ok) {

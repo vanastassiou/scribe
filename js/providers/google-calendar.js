@@ -1,19 +1,13 @@
 /**
  * Google Calendar integration for Scribe
  *
- * Creates calendar events for project deadlines
- *
- * To use this:
- * 1. Enable Google Calendar API in your Google Cloud project
- * 2. Add calendar scope to OAuth consent screen
- * 3. Set CLIENT_ID below
+ * Creates calendar events for project deadlines.
+ * Configure credentials in js/config.js
  */
 
 import { getToken, startAuth, isAuthenticated, logout } from '../oauth.js';
+import { config } from '../config.js';
 
-// Replace with your OAuth Client ID
-const CLIENT_ID = 'YOUR_CLIENT_ID.apps.googleusercontent.com';
-const REDIRECT_URI = window.location.origin + '/';
 const SCOPES = ['https://www.googleapis.com/auth/calendar.events'];
 
 const API_BASE = 'https://www.googleapis.com/calendar/v3';
@@ -29,7 +23,7 @@ export function isConnected() {
  * Start OAuth flow
  */
 export async function connect() {
-  await startAuth('google-calendar', CLIENT_ID, SCOPES, REDIRECT_URI);
+  await startAuth('google-calendar', config.google.clientId, SCOPES, config.redirectUri);
 }
 
 /**

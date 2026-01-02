@@ -1,18 +1,12 @@
 /**
  * Google Drive sync provider for Scribe
  *
- * To use this provider:
- * 1. Create a Google Cloud project
- * 2. Enable the Google Drive API
- * 3. Create OAuth 2.0 credentials
- * 4. Set CLIENT_ID below
+ * Configure credentials in js/config.js
  */
 
 import { getToken, startAuth, handleCallback, isAuthenticated, logout } from '../oauth.js';
+import { config } from '../config.js';
 
-// Replace with your OAuth Client ID
-const CLIENT_ID = 'YOUR_CLIENT_ID.apps.googleusercontent.com';
-const REDIRECT_URI = window.location.origin + '/';
 const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
 
 const API_BASE = 'https://www.googleapis.com';
@@ -33,14 +27,14 @@ export function isConnected() {
  * Start OAuth flow
  */
 export async function connect() {
-  await startAuth('google', CLIENT_ID, SCOPES, REDIRECT_URI);
+  await startAuth('google', config.google.clientId, SCOPES, config.redirectUri);
 }
 
 /**
  * Handle OAuth callback
  */
 export async function handleAuthCallback() {
-  return handleCallback('google', CLIENT_ID, REDIRECT_URI);
+  return handleCallback('google', config.google.clientId, config.redirectUri, config.google.clientSecret);
 }
 
 /**
@@ -293,6 +287,7 @@ export default {
   isConnected,
   connect,
   disconnect,
+  handleAuthCallback,
   fetch,
   push,
   uploadAttachment,
