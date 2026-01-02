@@ -9,8 +9,75 @@ import { config } from '../config.js';
 
 const API_BASE = 'https://api.dropboxapi.com/2';
 const CONTENT_BASE = 'https://content.dropboxapi.com/2';
-const DATA_FILE = '/scribe-data.json';
-const ATTACHMENTS_PATH = '/scribe-attachments';
+const DATA_FILENAME = 'scribe-data.json';
+const ATTACHMENTS_DIRNAME = 'scribe-attachments';
+
+/**
+ * Get saved folder from settings
+ * @returns {{name: string} | null}
+ */
+export function getSavedFolder() {
+  try {
+    const settings = JSON.parse(localStorage.getItem('scribe-settings') || '{}');
+    if (settings.dropboxFolder?.name) {
+      return settings.dropboxFolder;
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return null;
+}
+
+/**
+ * Save folder to settings
+ * @param {{name: string}} folder
+ */
+export function saveFolder(folder) {
+  try {
+    const settings = JSON.parse(localStorage.getItem('scribe-settings') || '{}');
+    settings.dropboxFolder = folder;
+    localStorage.setItem('scribe-settings', JSON.stringify(settings));
+  } catch {
+    // Ignore errors
+  }
+}
+
+/**
+ * Clear saved folder
+ */
+export function clearFolder() {
+  try {
+    const settings = JSON.parse(localStorage.getItem('scribe-settings') || '{}');
+    delete settings.dropboxFolder;
+    localStorage.setItem('scribe-settings', JSON.stringify(settings));
+  } catch {
+    // Ignore errors
+  }
+}
+
+/**
+ * Get the base path for Dropbox files
+ */
+function getBasePath() {
+  const folder = getSavedFolder();
+  return folder ? `/${folder.name}` : '';
+}
+
+/**
+ * Get the data file path
+ */
+function getDataFilePath() {
+  const base = getBasePath();
+  return base ? `${base}/${DATA_FILENAME}` : `/${DATA_FILENAME}`;
+}
+
+/**
+ * Get the attachments folder path
+ */
+function getAttachmentsPath() {
+  const base = getBasePath();
+  return base ? `${base}/${ATTACHMENTS_DIRNAME}` : `/${ATTACHMENTS_DIRNAME}`;
+}
 
 /**
  * Check if connected to Dropbox
@@ -101,13 +168,40 @@ async function contentRequest(path, options = {}) {
 }
 
 /**
+ * Check if a folder is configured for sync
+ */
+export function isFolderConfigured() {
+  // Dropbox works without a subfolder, so always return true if connected
+  return true;
+}
+
+/**
+ * Create a folder in Dropbox
+ * @param {string} name - Folder name
+ * @returns {Promise<{name: string}>}
+ */
+export async function createFolder(name) {
+  try {
+    await apiRequest('/files/create_folder_v2', {
+      body: JSON.stringify({ path: `/${name}` })
+    });
+  } catch (err) {
+    // Folder already exists is OK
+    if (!err.message.includes('conflict')) {
+      throw err;
+    }
+  }
+  return { name };
+}
+
+/**
  * Fetch data from Dropbox
  */
 export async function fetch() {
   try {
     const response = await contentRequest('/files/download', {
       headers: {
-        'Dropbox-API-Arg': JSON.stringify({ path: DATA_FILE })
+        'Dropbox-API-Arg': JSON.stringify({ path: getDataFilePath() })
       }
     });
 
@@ -127,10 +221,16 @@ export async function fetch() {
 export async function push(data) {
   const content = JSON.stringify(data, null, 2);
 
+  // Ensure folder exists if configured
+  const folder = getSavedFolder();
+  if (folder) {
+    await createFolder(folder.name);
+  }
+
   await contentRequest('/files/upload', {
     headers: {
       'Dropbox-API-Arg': JSON.stringify({
-        path: DATA_FILE,
+        path: getDataFilePath(),
         mode: 'overwrite'
       }),
       'Content-Type': 'application/octet-stream'
@@ -145,9 +245,15 @@ export async function push(data) {
  * Ensure attachments folder exists
  */
 async function ensureAttachmentsFolder() {
+  // Also ensure parent folder exists if configured
+  const folder = getSavedFolder();
+  if (folder) {
+    await createFolder(folder.name);
+  }
+
   try {
     await apiRequest('/files/create_folder_v2', {
-      body: JSON.stringify({ path: ATTACHMENTS_PATH })
+      body: JSON.stringify({ path: getAttachmentsPath() })
     });
   } catch (err) {
     // Folder already exists
@@ -168,7 +274,7 @@ async function ensureAttachmentsFolder() {
 export async function uploadAttachment(attachmentId, filename, blob, mimeType) {
   await ensureAttachmentsFolder();
 
-  const path = `${ATTACHMENTS_PATH}/${attachmentId}-${filename}`;
+  const path = `${getAttachmentsPath()}/${attachmentId}-${filename}`;
 
   const result = await contentRequest('/files/upload', {
     headers: {
@@ -225,7 +331,7 @@ export async function listAttachments() {
   try {
     const result = await apiRequest('/files/list_folder', {
       body: JSON.stringify({
-        path: ATTACHMENTS_PATH,
+        path: getAttachmentsPath(),
         recursive: false
       })
     });
@@ -261,6 +367,7 @@ export async function listAttachments() {
 export default {
   name: 'dropbox',
   isConnected,
+  isFolderConfigured,
   connect,
   disconnect,
   handleAuthCallback,
@@ -270,5 +377,9 @@ export default {
   downloadAttachment,
   deleteAttachment,
   listAttachments,
-  getAccountInfo
+  getAccountInfo,
+  getSavedFolder,
+  saveFolder,
+  clearFolder,
+  createFolder
 };

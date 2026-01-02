@@ -9,7 +9,7 @@ An offline-first idea capture app for saving random ideas, media recommendations
   - Project ideas (with deadlines, collaborators, resources)
   - Quick notes (freeform text)
 - Offline-first: works without internet, syncs when connected
-- Cross-device sync via Google Drive or Dropbox
+- Cross-device sync via Google Drive and/or Dropbox (can use both simultaneously)
 - Calendar integration for deadline reminders
 - Global tagging system with autocomplete
 - File attachments with drag-drop and paste support
@@ -213,6 +213,19 @@ The bookmarklet captures:
 - Selected text (if any)
 
 A popup opens pre-filled with this information for quick saving.
+
+## Multi-provider sync
+
+You can connect to both Google Drive and Dropbox simultaneously. Each provider:
+
+- Syncs independently with its own "Sync" button
+- Uses a configurable folder name (default: "Scribe")
+- Maintains its own sync state
+
+This allows you to:
+- Have redundant backups across multiple cloud providers
+- Share different folders with different people
+- Access your data from either provider
 
 ## Offline behavior
 

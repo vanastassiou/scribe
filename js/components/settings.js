@@ -4,7 +4,7 @@
 
 import { exportData, importData } from '../db.js';
 import { isAuthenticated, logout } from '../oauth.js';
-import { setProvider, sync, getStatus, SyncStatus } from '../sync.js';
+import { registerProvider, unregisterProvider, syncToProvider, getStatus, SyncStatus } from '../sync.js';
 import googleDrive from '../providers/google-drive.js';
 import dropbox from '../providers/dropbox.js';
 import { sendReminder, testNotification } from '../ntfy.js';
@@ -24,7 +24,8 @@ export function createSettings(container, options = {}) {
   // Check provider connection status
   const googleConnected = googleDrive.isConnected();
   const dropboxConnected = dropbox.isConnected();
-  const savedFolder = getSavedFolder();
+  const googleFolder = getSavedFolder();
+  const dropboxFolder = dropbox.getSavedFolder();
 
   container.innerHTML = `
     <section class="settings__section">
@@ -45,15 +46,18 @@ export function createSettings(container, options = {}) {
         </div>
       </div>
 
-      ${(googleConnected && savedFolder) ? `
-        <div class="settings__item" id="folder-setting">
+      ${(googleConnected && googleFolder) ? `
+        <div class="settings__item" id="google-folder-setting">
           <div>
-            <div class="settings__label">Sync folder</div>
-            <div class="settings__desc">Saving to: ${escapeHtml(savedFolder.name)}</div>
+            <div class="settings__label">Google Drive folder</div>
+            <div class="settings__desc">Saving to: ${escapeHtml(googleFolder.name)}</div>
           </div>
           <div class="settings__value">
-            <button class="btn btn--secondary btn--small" id="folder-change-btn">
+            <button class="btn btn--secondary btn--small" id="google-folder-change-btn">
               Change
+            </button>
+            <button class="btn btn--primary btn--small" id="google-sync-btn">
+              Sync
             </button>
           </div>
         </div>
@@ -62,7 +66,7 @@ export function createSettings(container, options = {}) {
       <div class="settings__item" id="dropbox-setting">
         <div>
           <div class="settings__label">Dropbox</div>
-          <div class="settings__desc">Alternative sync provider</div>
+          <div class="settings__desc">Sync your ideas across devices</div>
         </div>
         <div class="settings__value">
           <span id="dropbox-status" class="${dropboxConnected ? 'status--connected' : ''}">
@@ -74,14 +78,17 @@ export function createSettings(container, options = {}) {
         </div>
       </div>
 
-      ${((googleConnected && savedFolder) || dropboxConnected) ? `
-        <div class="settings__item">
+      ${dropboxConnected ? `
+        <div class="settings__item" id="dropbox-folder-setting">
           <div>
-            <div class="settings__label">Sync now</div>
-            <div class="settings__desc">Manually trigger a sync</div>
+            <div class="settings__label">Dropbox folder</div>
+            <div class="settings__desc">Saving to: ${dropboxFolder ? escapeHtml(dropboxFolder.name) : 'App folder root'}</div>
           </div>
           <div class="settings__value">
-            <button class="btn btn--primary btn--small" id="sync-now-btn">
+            <button class="btn btn--secondary btn--small" id="dropbox-folder-change-btn">
+              Change
+            </button>
+            <button class="btn btn--primary btn--small" id="dropbox-sync-btn">
               Sync
             </button>
           </div>
@@ -289,7 +296,7 @@ export function createSettings(container, options = {}) {
       }
       googleDrive.disconnect();
       clearFolder();
-      setProvider(null);
+      unregisterProvider('google-drive');
       window.location.reload();
     } else {
       // Show confirmation modal
@@ -309,12 +316,12 @@ export function createSettings(container, options = {}) {
     }
   });
 
-  // Change folder handler
-  const changeBtn = container.querySelector('#folder-change-btn');
-  if (changeBtn) {
-    changeBtn.addEventListener('click', async () => {
+  // Google folder change handler
+  const googleFolderBtn = container.querySelector('#google-folder-change-btn');
+  if (googleFolderBtn) {
+    googleFolderBtn.addEventListener('click', async () => {
       try {
-        changeBtn.disabled = true;
+        googleFolderBtn.disabled = true;
         const folder = await pickFolder();
         if (folder) {
           saveFolder(folder);
@@ -323,7 +330,76 @@ export function createSettings(container, options = {}) {
       } catch (err) {
         alert(`Failed to open folder picker: ${err.message}`);
       } finally {
-        if (changeBtn) changeBtn.disabled = false;
+        if (googleFolderBtn) googleFolderBtn.disabled = false;
+      }
+    });
+  }
+
+  // Google sync handler
+  const googleSyncBtn = container.querySelector('#google-sync-btn');
+  if (googleSyncBtn) {
+    googleSyncBtn.addEventListener('click', async () => {
+      googleSyncBtn.disabled = true;
+      googleSyncBtn.textContent = 'Syncing...';
+
+      try {
+        registerProvider(googleDrive);
+        const result = await syncToProvider(googleDrive);
+        if (result.success) {
+          alert('Google Drive sync completed.');
+        } else {
+          alert(`Sync failed: ${result.error}`);
+        }
+      } catch (err) {
+        alert(`Sync failed: ${err.message}`);
+      } finally {
+        googleSyncBtn.disabled = false;
+        googleSyncBtn.textContent = 'Sync';
+      }
+    });
+  }
+
+  // Dropbox folder change handler
+  const dropboxFolderBtn = container.querySelector('#dropbox-folder-change-btn');
+  if (dropboxFolderBtn) {
+    dropboxFolderBtn.addEventListener('click', () => {
+      const currentFolder = dropbox.getSavedFolder();
+      const newName = prompt(
+        'Enter folder name for Dropbox sync:',
+        currentFolder?.name || 'Scribe'
+      );
+      if (newName !== null) {
+        const trimmed = newName.trim();
+        if (trimmed) {
+          dropbox.saveFolder({ name: trimmed });
+        } else {
+          dropbox.clearFolder();
+        }
+        createSettings(container, options);
+      }
+    });
+  }
+
+  // Dropbox sync handler
+  const dropboxSyncBtn = container.querySelector('#dropbox-sync-btn');
+  if (dropboxSyncBtn) {
+    dropboxSyncBtn.addEventListener('click', async () => {
+      dropboxSyncBtn.disabled = true;
+      dropboxSyncBtn.textContent = 'Syncing...';
+
+      try {
+        registerProvider(dropbox);
+        const result = await syncToProvider(dropbox);
+        if (result.success) {
+          alert('Dropbox sync completed.');
+        } else {
+          alert(`Sync failed: ${result.error}`);
+        }
+      } catch (err) {
+        alert(`Sync failed: ${err.message}`);
+      } finally {
+        dropboxSyncBtn.disabled = false;
+        dropboxSyncBtn.textContent = 'Sync';
       }
     });
   }
@@ -337,9 +413,19 @@ export function createSettings(container, options = {}) {
         return;
       }
       dropbox.disconnect();
-      setProvider(null);
+      dropbox.clearFolder();
+      unregisterProvider('dropbox');
       window.location.reload();
     } else {
+      // Show confirmation modal
+      const confirmed = confirm(
+        'Scribe will create a folder called "Scribe" in your Dropbox app folder to store your data.\n\n' +
+        'You can change the folder name later in Settings.'
+      );
+      if (!confirmed) {
+        return;
+      }
+
       try {
         await dropbox.connect();
       } catch (err) {
@@ -348,35 +434,6 @@ export function createSettings(container, options = {}) {
     }
   });
 
-  // Sync now button
-  const syncBtn = container.querySelector('#sync-now-btn');
-  if (syncBtn) {
-    syncBtn.addEventListener('click', async () => {
-      syncBtn.disabled = true;
-      syncBtn.textContent = 'Syncing...';
-
-      try {
-        // Set active provider
-        if (googleConnected) {
-          setProvider(googleDrive);
-        } else if (dropboxConnected) {
-          setProvider(dropbox);
-        }
-
-        const result = await sync();
-        if (result.success) {
-          alert('Sync completed successfully.');
-        } else {
-          alert(`Sync failed: ${result.error}`);
-        }
-      } catch (err) {
-        alert(`Sync failed: ${err.message}`);
-      } finally {
-        syncBtn.disabled = false;
-        syncBtn.textContent = 'Sync';
-      }
-    });
-  }
 }
 
 /**

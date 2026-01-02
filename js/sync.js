@@ -1,6 +1,7 @@
 /**
  * Sync engine for Scribe
  * Handles synchronization with cloud providers
+ * Supports multiple providers syncing independently
  */
 
 import { getAllIdeas, getPendingSyncIdeas, bulkSaveIdeas, markSynced, getSyncMeta, setSyncMeta } from './db.js';
@@ -15,7 +16,7 @@ export const SyncStatus = {
 };
 
 let syncStatus = SyncStatus.IDLE;
-let syncProvider = null;
+let syncProviders = new Map(); // provider name -> provider instance
 let syncListeners = [];
 
 /**
@@ -36,10 +37,38 @@ function notifyStatusChange() {
 }
 
 /**
- * Set the current sync provider
+ * Set a sync provider (legacy single-provider API)
+ * @deprecated Use registerProvider instead
  */
 export function setProvider(provider) {
-  syncProvider = provider;
+  if (provider) {
+    registerProvider(provider);
+  } else {
+    syncProviders.clear();
+  }
+}
+
+/**
+ * Register a sync provider
+ */
+export function registerProvider(provider) {
+  if (provider && provider.name) {
+    syncProviders.set(provider.name, provider);
+  }
+}
+
+/**
+ * Unregister a sync provider
+ */
+export function unregisterProvider(providerName) {
+  syncProviders.delete(providerName);
+}
+
+/**
+ * Get all registered providers
+ */
+export function getProviders() {
+  return Array.from(syncProviders.values());
 }
 
 /**
@@ -50,30 +79,59 @@ export function getStatus() {
 }
 
 /**
- * Perform a full sync
+ * Perform a full sync to all registered providers
  */
 export async function sync() {
-  if (!syncProvider) {
-    console.log('No sync provider configured');
-    return;
+  const providers = getProviders();
+  if (providers.length === 0) {
+    console.log('No sync providers configured');
+    return { success: true, results: [] };
+  }
+
+  const results = [];
+  for (const provider of providers) {
+    const result = await syncToProvider(provider);
+    results.push({ provider: provider.name, ...result });
+  }
+
+  const allSuccess = results.every((r) => r.success);
+  return {
+    success: allSuccess,
+    results
+  };
+}
+
+/**
+ * Sync to a specific provider
+ * @param {Object} provider - Provider instance (or provider name string)
+ */
+export async function syncToProvider(provider) {
+  // If string, look up the provider
+  if (typeof provider === 'string') {
+    provider = syncProviders.get(provider);
+    if (!provider) {
+      return { success: false, error: `Provider '${provider}' not found` };
+    }
   }
 
   if (syncStatus === SyncStatus.SYNCING) {
     console.log('Sync already in progress');
-    return;
+    return { success: false, error: 'Sync already in progress' };
   }
 
   syncStatus = SyncStatus.SYNCING;
   notifyStatusChange();
 
+  const providerName = provider.name;
+
   try {
     // Get local data
     const localIdeas = await getAllIdeas();
     const pendingIdeas = await getPendingSyncIdeas();
-    const lastSync = await getSyncMeta('lastSync');
+    const lastSync = await getSyncMeta(`lastSync-${providerName}`);
 
     // Fetch remote data
-    const remoteData = await syncProvider.fetch();
+    const remoteData = await provider.fetch();
 
     // Merge
     const merged = mergeIdeas(localIdeas, remoteData.ideas || [], lastSync);
@@ -83,7 +141,7 @@ export async function sync() {
 
     // Push changes to remote
     if (merged.toUpload.length > 0 || pendingIdeas.length > 0) {
-      await syncProvider.push({
+      await provider.push({
         ideas: merged.local,
         lastModified: new Date().toISOString()
       });
@@ -94,15 +152,15 @@ export async function sync() {
       }
     }
 
-    // Update last sync time
-    await setSyncMeta('lastSync', new Date().toISOString());
+    // Update last sync time for this provider
+    await setSyncMeta(`lastSync-${providerName}`, new Date().toISOString());
 
     syncStatus = SyncStatus.IDLE;
     notifyStatusChange();
 
     return { success: true, merged: merged.local.length };
   } catch (err) {
-    console.error('Sync failed:', err);
+    console.error(`Sync to ${providerName} failed:`, err);
     syncStatus = SyncStatus.ERROR;
     notifyStatusChange();
     return { success: false, error: err.message };
@@ -163,8 +221,8 @@ export async function queueSync() {
 }
 
 /**
- * Check if we should sync (online and provider configured)
+ * Check if we should sync (online and at least one provider configured)
  */
 export function shouldSync() {
-  return navigator.onLine && syncProvider !== null;
+  return navigator.onLine && syncProviders.size > 0;
 }
