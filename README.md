@@ -138,6 +138,7 @@ To set up:
      google: {
        clientId: 'YOUR_CLIENT_ID.apps.googleusercontent.com',
        clientSecret: 'YOUR_CLIENT_SECRET',
+       apiKey: 'YOUR_API_KEY',
      },
      dropbox: {
        appKey: 'YOUR_APP_KEY',
@@ -154,14 +155,19 @@ Note: OAuth client IDs are semi-public - they're visible in browser network requ
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project
-3. Enable the Google Drive API
+3. Enable these APIs:
+   - Google Drive API
+   - Google Picker API
 4. Create OAuth 2.0 credentials:
    - Application type: Web application
    - Authorized redirect URI: `https://your-domain.com/` (your app URL)
-5. Copy the Client ID and Client Secret to `js/config.js`
+5. Create an API key:
+   - Go to Credentials → Create Credentials → API key
+   - Restrict it to Google Picker API (recommended)
+6. Copy the Client ID, Client Secret, and API Key to `js/config.js`
 
 Scopes required:
-- `https://www.googleapis.com/auth/drive.file` (access app-created files only)
+- `https://www.googleapis.com/auth/drive.file` (access to files created by the app)
 
 ## Google Calendar setup
 

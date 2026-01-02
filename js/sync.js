@@ -84,7 +84,7 @@ export async function sync() {
     // Push changes to remote
     if (merged.toUpload.length > 0 || pendingIdeas.length > 0) {
       await syncProvider.push({
-        ideas: [...localIdeas, ...pendingIdeas],
+        ideas: merged.local,
         lastModified: new Date().toISOString()
       });
 

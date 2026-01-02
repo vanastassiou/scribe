@@ -8,6 +8,7 @@ import { setProvider, sync, getStatus, SyncStatus } from '../sync.js';
 import googleDrive from '../providers/google-drive.js';
 import dropbox from '../providers/dropbox.js';
 import { sendReminder, testNotification } from '../ntfy.js';
+import { pickFolder, getSavedFolder, saveFolder, clearFolder } from '../google-picker.js';
 
 /**
  * Create settings panel
@@ -23,6 +24,7 @@ export function createSettings(container, options = {}) {
   // Check provider connection status
   const googleConnected = googleDrive.isConnected();
   const dropboxConnected = dropbox.isConnected();
+  const savedFolder = getSavedFolder();
 
   container.innerHTML = `
     <section class="settings__section">
@@ -43,6 +45,20 @@ export function createSettings(container, options = {}) {
         </div>
       </div>
 
+      ${(googleConnected && savedFolder) ? `
+        <div class="settings__item" id="folder-setting">
+          <div>
+            <div class="settings__label">Sync folder</div>
+            <div class="settings__desc">Saving to: ${escapeHtml(savedFolder.name)}</div>
+          </div>
+          <div class="settings__value">
+            <button class="btn btn--secondary btn--small" id="folder-change-btn">
+              Change
+            </button>
+          </div>
+        </div>
+      ` : ''}
+
       <div class="settings__item" id="dropbox-setting">
         <div>
           <div class="settings__label">Dropbox</div>
@@ -58,7 +74,7 @@ export function createSettings(container, options = {}) {
         </div>
       </div>
 
-      ${(googleConnected || dropboxConnected) ? `
+      ${((googleConnected && savedFolder) || dropboxConnected) ? `
         <div class="settings__item">
           <div>
             <div class="settings__label">Sync now</div>
@@ -265,33 +281,69 @@ export function createSettings(container, options = {}) {
 
   // Google Drive handler
   container.querySelector('#google-drive-btn').addEventListener('click', async () => {
-    if (googleConnected) {
+    // Check current state dynamically
+    if (googleDrive.isConnected()) {
+      const confirmed = confirm('Disconnect from Google Drive? Your data will remain in Drive but will no longer sync.');
+      if (!confirmed) {
+        return;
+      }
       googleDrive.disconnect();
+      clearFolder();
       setProvider(null);
-      onSyncStatusChange();
       window.location.reload();
     } else {
-      // Check if OAuth is configured
+      // Show confirmation modal
+      const confirmed = confirm(
+        'Scribe will create a folder called "Scribe" in your Google Drive to store your data.\n\n' +
+        'You can change the folder location later in Settings.'
+      );
+      if (!confirmed) {
+        return;
+      }
+
       try {
         await googleDrive.connect();
       } catch (err) {
-        alert(`Connection failed: ${err.message}\n\nMake sure OAuth is configured in js/providers/google-drive.js`);
+        alert(`Connection failed: ${err.message}\n\nMake sure OAuth is configured in js/config.js`);
       }
     }
   });
 
+  // Change folder handler
+  const changeBtn = container.querySelector('#folder-change-btn');
+  if (changeBtn) {
+    changeBtn.addEventListener('click', async () => {
+      try {
+        changeBtn.disabled = true;
+        const folder = await pickFolder();
+        if (folder) {
+          saveFolder(folder);
+          createSettings(container, options);
+        }
+      } catch (err) {
+        alert(`Failed to open folder picker: ${err.message}`);
+      } finally {
+        if (changeBtn) changeBtn.disabled = false;
+      }
+    });
+  }
+
   // Dropbox handler
   container.querySelector('#dropbox-btn').addEventListener('click', async () => {
-    if (dropboxConnected) {
+    // Check current state dynamically
+    if (dropbox.isConnected()) {
+      const confirmed = confirm('Disconnect from Dropbox? Your data will remain in Dropbox but will no longer sync.');
+      if (!confirmed) {
+        return;
+      }
       dropbox.disconnect();
       setProvider(null);
-      onSyncStatusChange();
       window.location.reload();
     } else {
       try {
         await dropbox.connect();
       } catch (err) {
-        alert(`Connection failed: ${err.message}\n\nMake sure OAuth is configured in js/providers/dropbox.js`);
+        alert(`Connection failed: ${err.message}\n\nMake sure OAuth is configured in js/config.js`);
       }
     }
   });

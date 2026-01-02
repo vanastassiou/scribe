@@ -129,11 +129,8 @@ export async function getIdeasByType(type) {
  * Get ideas pending sync
  */
 export async function getPendingSyncIdeas() {
-  await initDB();
-  const tx = getTransaction(['ideas']);
-  const store = tx.objectStore('ideas');
-  const index = store.index('pendingSync');
-  return promisify(index.getAll(true));
+  const ideas = await getAllIdeas();
+  return ideas.filter((idea) => idea.pendingSync === true);
 }
 
 /**

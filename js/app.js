@@ -12,6 +12,7 @@ import { createSettings, getSettings } from './components/settings.js';
 import { scheduleReminderCheck } from './ntfy.js';
 import googleDrive from './providers/google-drive.js';
 import dropbox from './providers/dropbox.js';
+import { createFolder, saveFolder, getSavedFolder } from './google-picker.js';
 
 // ==========================================================================
 // App state
@@ -353,6 +354,19 @@ async function handleOAuthCallback() {
       if (parsed.state === state) {
         await googleDrive.handleAuthCallback();
         console.log('Google Drive connected successfully');
+
+        // Auto-create Scribe folder if not already configured
+        if (!getSavedFolder()) {
+          try {
+            const folder = await createFolder('Scribe');
+            saveFolder(folder);
+            console.log('Created Scribe folder:', folder.id);
+          } catch (err) {
+            console.error('Failed to create Scribe folder:', err);
+            // Continue anyway - user can set folder manually in settings
+          }
+        }
+
         matched = true;
       }
     }

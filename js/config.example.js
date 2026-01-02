@@ -10,6 +10,7 @@ export const config = {
   google: {
     clientId: 'YOUR_CLIENT_ID.apps.googleusercontent.com',
     clientSecret: 'YOUR_CLIENT_SECRET',
+    apiKey: 'YOUR_API_KEY',
   },
 
   // Dropbox App credentials

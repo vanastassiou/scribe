@@ -6,15 +6,18 @@
 
 import { getToken, startAuth, handleCallback, isAuthenticated, logout } from '../oauth.js';
 import { config } from '../config.js';
+import { getSavedFolder } from '../google-picker.js';
 
-const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
+const SCOPES = [
+  'https://www.googleapis.com/auth/drive.file'
+];
 
 const API_BASE = 'https://www.googleapis.com';
 const DATA_FILE = 'scribe-data.json';
 const ATTACHMENTS_FOLDER = 'scribe-attachments';
 
 let fileId = null;
-let folderId = null;
+let attachmentsFolderId = null;
 
 /**
  * Check if connected to Google Drive
@@ -43,7 +46,14 @@ export async function handleAuthCallback() {
 export function disconnect() {
   logout('google');
   fileId = null;
-  folderId = null;
+  attachmentsFolderId = null;
+}
+
+/**
+ * Check if a folder is configured for sync
+ */
+export function isFolderConfigured() {
+  return getSavedFolder() !== null;
 }
 
 /**
@@ -55,7 +65,7 @@ async function apiRequest(path, options = {}) {
     throw new Error('Not authenticated with Google');
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await window.fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -64,34 +74,49 @@ async function apiRequest(path, options = {}) {
   });
 
   if (!response.ok) {
-    const error = await response.json();
+    const error = await response.json().catch(() => ({}));
     throw new Error(error.error?.message || 'API request failed');
   }
 
-  return response.json();
+  // Handle empty responses
+  const text = await response.text();
+  if (!text) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
 }
 
 /**
- * Find or create the data file
+ * Find or create the data file in the selected folder
  */
 async function getOrCreateDataFile() {
   if (fileId) return fileId;
 
-  // Search for existing file
-  const query = `name='${DATA_FILE}' and trashed=false`;
+  const folder = getSavedFolder();
+  if (!folder) {
+    throw new Error('No folder selected. Please select a folder in Settings.');
+  }
+
+  // Search for existing file in the selected folder
+  const query = `name='${DATA_FILE}' and '${folder.id}' in parents and trashed=false`;
   const searchResult = await apiRequest(
-    `/drive/v3/files?q=${encodeURIComponent(query)}&spaces=appDataFolder`
+    `/drive/v3/files?q=${encodeURIComponent(query)}`
   );
 
-  if (searchResult.files?.length > 0) {
+  if (searchResult?.files?.length > 0) {
     fileId = searchResult.files[0].id;
     return fileId;
   }
 
-  // Create new file
+  // Create new file in the selected folder
   const metadata = {
     name: DATA_FILE,
-    parents: ['appDataFolder'],
+    parents: [folder.id],
     mimeType: 'application/json'
   };
 
@@ -106,25 +131,31 @@ async function getOrCreateDataFile() {
 }
 
 /**
- * Find or create the attachments folder
+ * Find or create the attachments folder inside the selected folder
  */
 async function getOrCreateAttachmentsFolder() {
-  if (folderId) return folderId;
+  if (attachmentsFolderId) return attachmentsFolderId;
 
-  // Search for existing folder
-  const query = `name='${ATTACHMENTS_FOLDER}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+  const folder = getSavedFolder();
+  if (!folder) {
+    throw new Error('No folder selected. Please select a folder in Settings.');
+  }
+
+  // Search for existing attachments folder inside selected folder
+  const query = `name='${ATTACHMENTS_FOLDER}' and '${folder.id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
   const searchResult = await apiRequest(
     `/drive/v3/files?q=${encodeURIComponent(query)}`
   );
 
-  if (searchResult.files?.length > 0) {
-    folderId = searchResult.files[0].id;
-    return folderId;
+  if (searchResult?.files?.length > 0) {
+    attachmentsFolderId = searchResult.files[0].id;
+    return attachmentsFolderId;
   }
 
-  // Create new folder
+  // Create new attachments folder inside selected folder
   const metadata = {
     name: ATTACHMENTS_FOLDER,
+    parents: [folder.id],
     mimeType: 'application/vnd.google-apps.folder'
   };
 
@@ -134,8 +165,8 @@ async function getOrCreateAttachmentsFolder() {
     body: JSON.stringify(metadata)
   });
 
-  folderId = createResult.id;
-  return folderId;
+  attachmentsFolderId = createResult.id;
+  return attachmentsFolderId;
 }
 
 /**
@@ -146,11 +177,55 @@ export async function fetch() {
 
   try {
     const response = await apiRequest(`/drive/v3/files/${id}?alt=media`);
-    return response;
+    // Ensure we return a valid object with ideas array
+    if (!response || typeof response !== 'object') {
+      return { ideas: [], lastModified: null };
+    }
+    return {
+      ideas: Array.isArray(response.ideas) ? response.ideas : [],
+      lastModified: response.lastModified || null
+    };
   } catch (err) {
     // File exists but is empty or invalid
     return { ideas: [], lastModified: null };
   }
+}
+
+/**
+ * Sanitize idea for JSON serialization (remove non-serializable data)
+ */
+function sanitizeIdea(idea) {
+  return {
+    id: idea.id,
+    type: idea.type,
+    title: idea.title,
+    content: idea.content,
+    mediaType: idea.mediaType,
+    recommender: idea.recommender,
+    reason: idea.reason,
+    url: idea.url,
+    status: idea.status,
+    rating: idea.rating,
+    notes: idea.notes,
+    description: idea.description,
+    resources: idea.resources,
+    deadline: idea.deadline,
+    collaborators: idea.collaborators,
+    interest: idea.interest,
+    effort: idea.effort,
+    tags: idea.tags || [],
+    attachments: (idea.attachments || []).map((att) => ({
+      id: att.id,
+      filename: att.filename,
+      mimeType: att.mimeType,
+      size: att.size,
+      remoteId: att.remoteId,
+      syncStatus: att.syncStatus
+    })),
+    createdAt: idea.createdAt,
+    updatedAt: idea.updatedAt,
+    pendingSync: idea.pendingSync
+  };
 }
 
 /**
@@ -159,13 +234,19 @@ export async function fetch() {
 export async function push(data) {
   const id = await getOrCreateDataFile();
 
+  // Sanitize ideas to ensure they're serializable
+  const sanitizedData = {
+    ideas: (data.ideas || []).map(sanitizeIdea),
+    lastModified: data.lastModified
+  };
+
   const metadata = {
     mimeType: 'application/json'
   };
 
   const form = new FormData();
   form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-  form.append('file', new Blob([JSON.stringify(data)], { type: 'application/json' }));
+  form.append('file', new Blob([JSON.stringify(sanitizedData)], { type: 'application/json' }));
 
   const token = getToken('google');
   const response = await window.fetch(
@@ -285,6 +366,7 @@ export async function listAttachments() {
 export default {
   name: 'google-drive',
   isConnected,
+  isFolderConfigured,
   connect,
   disconnect,
   handleAuthCallback,
