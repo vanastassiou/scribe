@@ -23,11 +23,46 @@ let currentFilter = { type: '', status: '', tag: '' };
 let searchQuery = '';
 
 // ==========================================================================
+// Theme
+// ==========================================================================
+
+function initTheme() {
+  const saved = localStorage.getItem('scribe-theme');
+  if (saved) {
+    document.documentElement.dataset.theme = saved;
+  }
+  // Default is dark (no data-theme attribute)
+}
+
+function toggleTheme() {
+  const current = document.documentElement.dataset.theme;
+  const next = current === 'light' ? 'dark' : 'light';
+  if (next === 'dark') {
+    delete document.documentElement.dataset.theme;
+  } else {
+    document.documentElement.dataset.theme = next;
+  }
+  localStorage.setItem('scribe-theme', next);
+}
+
+// Initialize theme immediately to prevent flash
+initTheme();
+
+// ==========================================================================
+// Sync status
+// ==========================================================================
+
+function updateSyncStatus() {
+  const connected = googleDrive.isConnected() || dropbox.isConnected();
+  elements.syncBtn.classList.toggle('disconnected', !connected);
+}
+
+// ==========================================================================
 // DOM Elements
 // ==========================================================================
 
 const elements = {
-  syncStatus: document.getElementById('sync-status'),
+  syncBtn: document.getElementById('btn-sync'),
   offlineIndicator: document.getElementById('offline-indicator'),
   ideaListContainer: document.getElementById('idea-list'),
   emptyState: document.getElementById('empty-state'),
@@ -35,9 +70,8 @@ const elements = {
   filterStatus: document.getElementById('filter-status'),
   filterTags: document.getElementById('filter-tags'),
   searchInput: document.getElementById('search'),
-  newBtn: document.getElementById('btn-new'),
+  themeBtn: document.getElementById('btn-theme'),
   settingsBtn: document.getElementById('btn-settings'),
-  typeSelectorModal: document.getElementById('type-selector'),
   ideaFormModal: document.getElementById('idea-form-modal'),
   settingsModal: document.getElementById('settings-modal'),
   formTitle: document.getElementById('form-title'),
@@ -72,6 +106,9 @@ async function init() {
     onSyncConnect: handleSyncConnect,
     onSyncDisconnect: handleSyncDisconnect
   });
+
+  // Update sync button status
+  updateSyncStatus();
 
   // Register service worker
   registerServiceWorker();
@@ -148,9 +185,12 @@ function updateStatusOptions() {
 // ==========================================================================
 
 function setupEventListeners() {
-  // New idea button
-  elements.newBtn.addEventListener('click', () => {
-    openTypeSelector();
+  // Type buttons for new idea
+  document.querySelectorAll('.type-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const type = btn.dataset.type;
+      openNewIdeaForm(type);
+    });
   });
 
   // Settings button
@@ -158,33 +198,20 @@ function setupEventListeners() {
     elements.settingsModal.showModal();
   });
 
-  // Type selector
-  elements.typeSelectorModal.addEventListener('click', (e) => {
-    const typeCard = e.target.closest('.type-card');
-    if (typeCard) {
-      const type = typeCard.dataset.type;
-      elements.typeSelectorModal.close();
-      openNewIdeaForm(type);
-    }
+  // Theme toggle
+  elements.themeBtn.addEventListener('click', toggleTheme);
 
-    if (e.target.dataset.action === 'close') {
-      elements.typeSelectorModal.close();
-    }
+  // Sync button - opens settings
+  elements.syncBtn.addEventListener('click', () => {
+    elements.settingsModal.showModal();
   });
 
   // Modal close on backdrop click
-  [elements.typeSelectorModal, elements.ideaFormModal, elements.settingsModal].forEach((modal) => {
+  [elements.ideaFormModal, elements.settingsModal].forEach((modal) => {
     modal.addEventListener('click', (e) => {
       if (e.target === modal) {
         modal.close();
       }
-    });
-  });
-
-  // Close buttons in modals
-  document.querySelectorAll('[data-action="close"]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      btn.closest('dialog').close();
     });
   });
 
@@ -234,7 +261,7 @@ function setupKeyboardShortcuts() {
     switch (e.key) {
       case 'n':
         e.preventDefault();
-        openTypeSelector();
+        openNewIdeaForm('note');
         break;
 
       case '/':
@@ -271,10 +298,6 @@ function setupKeyboardShortcuts() {
 // ==========================================================================
 // Modal handlers
 // ==========================================================================
-
-function openTypeSelector() {
-  elements.typeSelectorModal.showModal();
-}
 
 function openNewIdeaForm(type) {
   elements.formTitle.textContent = `New ${type}`;
@@ -419,7 +442,6 @@ function setupOnlineStatus() {
   function updateStatus() {
     const online = navigator.onLine;
     elements.offlineIndicator.classList.toggle('hidden', online);
-    elements.syncStatus.classList.toggle('status-indicator--offline', !online);
   }
 
   window.addEventListener('online', updateStatus);

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'scribe-v1';
+const CACHE_NAME = 'scribe-v11';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -15,7 +15,10 @@ const STATIC_ASSETS = [
   '/js/components/tag-input.js',
   '/js/components/file-picker.js',
   '/js/components/settings.js',
-  '/manifest.json'
+  '/manifest.json',
+  '/fonts/Lato-Regular.woff2',
+  '/fonts/Lato-Bold.woff2',
+  '/fonts/Cinzel-Variable.woff2'
 ];
 
 // Install: cache static assets

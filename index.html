@@ -4,55 +4,95 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Capture and organize ideas offline-first">
-  <meta name="theme-color" content="#1a1a2e">
+  <meta name="theme-color" content="#2A2520">
   <title>Scribe</title>
   <link rel="manifest" href="manifest.json">
+  <link rel="preload" href="/fonts/Lato-Regular.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
   <link rel="stylesheet" href="css/style.css">
+  <script>
+    // Apply theme before paint to prevent flash
+    const t = localStorage.getItem('scribe-theme');
+    if (t) document.documentElement.dataset.theme = t;
+  </script>
 </head>
 <body>
   <div id="app">
     <header class="header">
       <h1 class="header__title">Scribe</h1>
       <div class="header__status">
-        <span id="sync-status" class="status-indicator" title="Sync status"></span>
         <span id="offline-indicator" class="offline-badge hidden">Offline</span>
       </div>
       <nav class="header__nav">
+        <button id="btn-sync" class="btn btn--icon" aria-label="Sync status">
+          <svg class="icon-cloud" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+          </svg>
+          <svg class="icon-cloud-off" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22.61 16.95A5 5 0 0 0 18 10h-1.26a8 8 0 0 0-7.05-6M5 5a8 8 0 0 0 4 15h9a5 5 0 0 0 1.7-.3"/>
+            <line x1="1" y1="1" x2="23" y2="23"/>
+          </svg>
+        </button>
+        <button id="btn-theme" class="btn btn--icon" aria-label="Toggle theme">
+          <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/>
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+          </svg>
+          <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </button>
         <button id="btn-settings" class="btn btn--icon" aria-label="Settings">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"/>
-            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
           </svg>
         </button>
       </nav>
     </header>
 
     <main class="main">
-      <div class="toolbar">
-        <div class="toolbar__filters">
-          <select id="filter-type" class="select">
-            <option value="">All types</option>
-            <option value="media">Media</option>
-            <option value="project">Projects</option>
-            <option value="note">Notes</option>
-          </select>
-          <select id="filter-status" class="select">
-            <option value="">All statuses</option>
-          </select>
-          <input type="text" id="filter-tags" class="input" placeholder="Filter by tag...">
+      <details class="section" open>
+        <summary class="section__header">Add new idea</summary>
+        <div class="section__content">
+          <div class="type-buttons">
+            <button class="type-btn" data-type="media">
+              <span class="type-btn__icon">🎬</span>
+              <span class="type-btn__label">Media</span>
+            </button>
+            <button class="type-btn" data-type="project">
+              <span class="type-btn__icon">💡</span>
+              <span class="type-btn__label">Project</span>
+            </button>
+            <button class="type-btn" data-type="note">
+              <span class="type-btn__icon">📝</span>
+              <span class="type-btn__label">Note</span>
+            </button>
+          </div>
         </div>
-        <div class="toolbar__search">
-          <input type="search" id="search" class="input input--search" placeholder="Search ideas...">
+      </details>
+
+      <details class="section" open>
+        <summary class="section__header">Search existing ideas</summary>
+        <div class="section__content">
+          <div class="search-controls">
+            <input type="search" id="search" class="input input--search" placeholder="Search ideas...">
+            <div class="search-filters">
+              <select id="filter-type" class="select">
+                <option value="">All types</option>
+                <option value="media">Media</option>
+                <option value="project">Projects</option>
+                <option value="note">Notes</option>
+              </select>
+              <select id="filter-status" class="select">
+                <option value="">All statuses</option>
+              </select>
+              <input type="text" id="filter-tags" class="input" placeholder="Filter by tag...">
+            </div>
+          </div>
         </div>
-        <div class="toolbar__actions">
-          <button id="btn-new" class="btn btn--primary">
-            <span class="btn__icon">+</span>
-            <span class="btn__text">New idea</span>
-          </button>
-        </div>
-      </div>
+      </details>
 
       <div id="idea-list" class="idea-list">
         <!-- Ideas rendered here -->
@@ -62,31 +102,6 @@
         <p class="empty-state__text">No ideas yet. Click "New idea" to add one.</p>
       </div>
     </main>
-
-    <!-- New idea type selector modal -->
-    <dialog id="type-selector" class="modal">
-      <div class="modal__content">
-        <h2 class="modal__title">What kind of idea?</h2>
-        <div class="type-grid">
-          <button class="type-card" data-type="media">
-            <span class="type-card__icon">🎬</span>
-            <span class="type-card__label">Media</span>
-            <span class="type-card__desc">Book, film, show, podcast...</span>
-          </button>
-          <button class="type-card" data-type="project">
-            <span class="type-card__icon">💡</span>
-            <span class="type-card__label">Project</span>
-            <span class="type-card__desc">Something to make or do</span>
-          </button>
-          <button class="type-card" data-type="note">
-            <span class="type-card__icon">📝</span>
-            <span class="type-card__label">Quick note</span>
-            <span class="type-card__desc">Freeform text with tags</span>
-          </button>
-        </div>
-        <button class="btn btn--text modal__close" data-action="close">Cancel</button>
-      </div>
-    </dialog>
 
     <!-- Idea form modal -->
     <dialog id="idea-form-modal" class="modal">
@@ -105,7 +120,9 @@
         <div id="settings-content" class="settings">
           <!-- Settings injected by JS -->
         </div>
-        <button class="btn btn--text modal__close" data-action="close">Close</button>
+        <form method="dialog" class="modal__close">
+          <button class="btn btn--text">Close</button>
+        </form>
       </div>
     </dialog>
   </div>
